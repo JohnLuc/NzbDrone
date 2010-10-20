@@ -1,12 +1,13 @@
 using System.Collections.Generic;
 using System.IO;
 using MbUnit.Framework;
-using NzbDrone.Core.Repository;
-using NzbDrone.Core.Repository.Quality;
+using NzbDrone.Core.Entities.Quality;
 
 namespace NzbDrone.Core.Test
 {
     [TestFixture]
+    // ReSharper disable InconsistentNaming
+
     public class QualityProfileTest
     {
         /// <summary>

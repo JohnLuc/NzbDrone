@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using NLog;
-using NzbDrone.Core.Repository;
+using NzbDrone.Core.Entities;
 using SubSonic.Repository;
 
 namespace NzbDrone.Core.Providers
@@ -21,7 +21,7 @@ namespace NzbDrone.Core.Providers
             throw new NotImplementedException();
         }
 
-        public List<Season> GetSeasongs(int seriesId)
+        public List<Season> GetSeasons(int seriesId)
         {
             throw new NotImplementedException();
         }
@@ -31,7 +31,7 @@ namespace NzbDrone.Core.Providers
             if (_sonicRepo.Exists<Season>(s => s.SeasonId == seasonId))
                 return;
             //TODO: Calculate Season Folder
-            Logger.Debug("Creating Season. SeriesID:{0} SeasonID:{1} SeasonNumber:{2} Folder:{3}", seriesId, seasonId, seasonNumber, string.Empty);
+            Logger.Debug("Adding Season To DB. [SeriesID:{0} SeasonID:{1} SeasonNumber:{2} Folder:{3}]", seriesId, seasonId, seasonNumber, "????");
 
             var newSeason = new Season()
             {

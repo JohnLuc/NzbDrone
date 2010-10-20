@@ -2,12 +2,11 @@
 using System.Collections.Generic;
 using System.Text;
 using Gallio.Framework;
-using log4net;
 using MbUnit.Framework;
 using MbUnit.Framework.ContractVerifiers;
 using Moq;
+using NzbDrone.Core.Entities;
 using NzbDrone.Core.Providers;
-using NzbDrone.Core.Repository;
 using SubSonic.Repository;
 
 namespace NzbDrone.Core.Test

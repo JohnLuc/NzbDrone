@@ -3,17 +3,16 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using Gallio.Framework;
-using log4net;
 using MbUnit.Framework;
 using MbUnit.Framework.ContractVerifiers;
 using Moq;
 using NzbDrone.Core.Providers;
-using NzbDrone.Core.Repository;
 using SubSonic.Repository;
 
 namespace NzbDrone.Core.Test
 {
     [TestFixture]
+    // ReSharper disable InconsistentNaming
     public class SabControllerTest
     {
         [Test]

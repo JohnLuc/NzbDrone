@@ -4,7 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using NLog;
-using NzbDrone.Core.Repository;
+using NzbDrone.Core.Entities;
+using NzbDrone.Core.Entities.Notification;
 using SubSonic.Repository;
 using TvdbLib.Data;
 
@@ -50,7 +51,7 @@ namespace NzbDrone.Core.Providers
 
         #region ISeriesProvider Members
 
-        public IQueryable<Series> GetSeries()
+        public IQueryable<Series> GetAllSeries()
         {
             return _sonioRepo.All<Series>();
         }
@@ -85,38 +86,12 @@ namespace NzbDrone.Core.Providers
             return CleanTitleRegex.Replace(match.Groups["showName"].Value, String.Empty).Replace(".", " ");
         }
 
-        public void SyncSeriesWithDisk()
+        public List<String> GetUnmappedFolders()
         {
+            Logger.Debug("Generating list of unmapped folders");
             if (String.IsNullOrEmpty(_config.SeriesRoot))
                 throw new InvalidOperationException("TV Series folder is not configured yet.");
 
-            foreach (string seriesFolder in GetUnmappedFolders())
-            {
-                Logger.Info("Folder '{0}' isn't mapped to a series in the database. Trying to map it.'", seriesFolder);
-                var mappedSeries = MapPathToSeries(seriesFolder);
-
-                if (mappedSeries == null)
-                {
-                    Logger.Warn("Unable to find a matching series for '{0}'", seriesFolder);
-                }
-                else
-                {
-
-                    if (!_sonioRepo.Exists<Series>(s => s.SeriesId == mappedSeries.Id))
-                    {
-                        RegisterSeries(seriesFolder, mappedSeries);
-                    }
-                    else
-                    {
-                        Logger.Warn("Folder '{0}' mapped to '{1}' which is already another folder assigned to it.'", seriesFolder, mappedSeries.SeriesName);
-                    }
-                }
-
-            }
-        }
-
-        public List<String> GetUnmappedFolders()
-        {
             var results = new List<String>();
             foreach (string seriesFolder in _diskProvider.GetDirectories(_config.SeriesRoot))
             {
@@ -127,6 +102,7 @@ namespace NzbDrone.Core.Providers
                 }
             }
 
+            Logger.Debug("{0} unmapped folders detected.", results.Count);
             return results;
         }
 
@@ -142,9 +118,9 @@ namespace NzbDrone.Core.Providers
         }
 
 
-        public void RegisterSeries(string path, TvdbSeries series)
+        public void AddSeries(string path, TvdbSeries series)
         {
-            Logger.Info("registering '{0}' with [{1}]-{2}", path, series.Id, series.SeriesName);
+            Logger.Info("Adding Series [{0}]:{1} Path: {2}", series.Id, series.SeriesName, path);
             var repoSeries = new Series();
             repoSeries.SeriesId = series.Id;
             repoSeries.Title = series.SeriesName;

@@ -37,7 +37,7 @@ namespace NzbDrone.Core.Providers
                 }
             }
 
-            Logger.Debug("Search for '{0}' returned {1} results", title);
+            Logger.Debug("Search for '{0}' returned {1} results", title, result.Count);
             return result;
         }
 
@@ -67,7 +67,7 @@ namespace NzbDrone.Core.Providers
         /// </returns>
         public static bool IsTitleMatch(string directoryName, string tvdbTitle)
         {
-            Logger.Debug("Trying to match '{0}' and '{1}'", tvdbTitle, directoryName);
+
 
             var result = false;
 

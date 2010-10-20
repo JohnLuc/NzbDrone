@@ -1,34 +1,51 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Web;
 using Ninject;
 using NLog.Config;
 using NLog.Targets;
+using NzbDrone.Core.Entities;
+using NzbDrone.Core.Entities.Episode;
 using NzbDrone.Core.Providers;
-using NzbDrone.Core.Repository;
-using NzbDrone.Core.Repository.Episode;
+using NzbDrone.Core.Providers.Fakes;
 using SubSonic.DataProviders;
 using SubSonic.Repository;
 using NLog;
+using System.Linq;
 
 namespace NzbDrone.Core
 {
     public static class CentralDispatch
     {
-        public static void BindKernel(IKernel kernel)
+        private static IKernel _kernel;
+        private static readonly Object kernelLock = new object();
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        public static void BindKernel()
         {
-            string connectionString = String.Format("Data Source={0};Version=3;", Path.Combine(AppPath, "nzbdrone.db"));
-            var provider = ProviderFactory.GetProvider(connectionString, "System.Data.SQLite");
+            lock (kernelLock)
+            {
+                Logger.Debug("Binding Ninject's Kernel");
+                _kernel = new StandardKernel();
 
-            kernel.Bind<ISeriesProvider>().To<SeriesProvider>();
-            kernel.Bind<ISeasonProvider>().To<SeasonProvider>();
-            kernel.Bind<IEpisodeProvider>().To<EpisodeProvider>();
-            kernel.Bind<IDiskProvider>().To<DiskProvider>();
-            kernel.Bind<ITvDbProvider>().To<TvDbProvider>();
-            kernel.Bind<IConfigProvider>().To<ConfigProvider>().InSingletonScope();
-            kernel.Bind<IRepository>().ToMethod(c => new SimpleRepository(provider, SimpleRepositoryOptions.RunMigrations)).InSingletonScope();
+                string connectionString = String.Format("Data Source={0};Version=3;", Path.Combine(AppPath, "nzbdrone.db"));
+                var provider = ProviderFactory.GetProvider(connectionString, "System.Data.SQLite");
+                provider.Log = new Instrumentation.NlogWriter();
+                provider.LogParams = true;
 
-            ForceMigration(kernel.Get<IRepository>());
+                _kernel.Bind<ISeriesProvider>().To<SeriesProvider>().InSingletonScope();
+                _kernel.Bind<ISeasonProvider>().To<SeasonProvider>();
+                _kernel.Bind<IEpisodeProvider>().To<EpisodeProvider>();
+                _kernel.Bind<IDiskProvider>().To<DiskProvider>();
+                _kernel.Bind<ITvDbProvider>().To<TvDbProvider>();
+                _kernel.Bind<IConfigProvider>().To<ConfigProvider>().InSingletonScope();
+                _kernel.Bind<ISyncProvider>().To<SyncProvider>().InSingletonScope();
+                _kernel.Bind<INotificationProvider>().To<NotificationProvider>().InSingletonScope();
+                _kernel.Bind<IRepository>().ToMethod(c => new SimpleRepository(provider, SimpleRepositoryOptions.RunMigrations)).InSingletonScope();
+
+                ForceMigration(_kernel.Get<IRepository>());
+            }
         }
 
         public static String AppPath
@@ -44,48 +61,56 @@ namespace NzbDrone.Core
 
         }
 
-
-        public static void ConfigureNlog()
+        public static IKernel NinjectKernel
         {
-            // Step 1. Create configuration object 
-            var config = new LoggingConfiguration();
-
-            // Step 2. Create targets and add them to the configuration 
-            var consoleTarget = new DebuggerTarget();
-            config.AddTarget("console", consoleTarget);
-
-            FileTarget fileTarget = new FileTarget();
-            config.AddTarget("file", fileTarget);
-
-            // Step 3. Set target properties 
-            consoleTarget.Layout = "${logger} ${message}";
-            fileTarget.FileName = "${basedir}/test.log";
-            fileTarget.Layout = "${message}";
-
-            // Step 4. Define rules
-            LoggingRule rule1 = new LoggingRule("*", LogLevel.Trace, consoleTarget);
-            config.LoggingRules.Add(rule1);
-
-            LoggingRule rule2 = new LoggingRule("*", LogLevel.Trace, fileTarget);
-            config.LoggingRules.Add(rule2);
-
-            // Step 5. Activate the configuration
-            NLog.LogManager.Configuration = config;
-
-            Logger logger = LogManager.GetCurrentClassLogger();
-            logger.Trace("trace log message");
-            logger.Debug("debug log message");
-            logger.Info("info log message");
-            logger.Warn("warn log message");
-            logger.Error("error log message");
-            logger.Fatal("fatal log message");
+            get
+            {
+                if (_kernel == null)
+                {
+                    BindKernel();
+                }
+                return _kernel;
+            }
         }
 
         private static void ForceMigration(IRepository repository)
         {
             repository.GetPaged<Series>(0, 1);
             repository.GetPaged<EpisodeInfo>(0, 1);
-            repository.GetPaged<Series>(0, 1);
+        }
+
+
+        /// <summary>
+        /// This method forces IISExpress process to exit with the host application
+        /// </summary>
+        public static void DedicateToHost()
+        {
+            try
+            {
+                Logger.Info("Attaching to parent process for automatic termination.");
+                var pc = new PerformanceCounter("Process", "Creating Process ID", Process.GetCurrentProcess().ProcessName);
+                var pid = (int)pc.NextValue();
+                var hostProcess = Process.GetProcessById(pid);
+
+                hostProcess.EnableRaisingEvents = true;
+                hostProcess.Exited += (delegate
+                                       {
+                                           Logger.Info("Host has been terminated. Shutting down web server.");
+                                           ShutDown();
+                                       });
+
+                Logger.Info("Successfully Attached to host. Process ID: {0}", pid);
+            }
+            catch (Exception e)
+            {
+                Logger.Fatal(e);
+            }
+        }
+
+        private static void ShutDown()
+        {
+            Logger.Info("Shutting down application.");
+            Process.GetCurrentProcess().Kill();
         }
     }
 }
